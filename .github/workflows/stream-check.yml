@@ -3,8 +3,11 @@ name: Stream check
 # Opens the plugin's IEX websocket for 45 seconds shortly after the New York
 # open and fails when no trades arrive. Alpaca's free plan allows one websocket
 # per account, so the run is kept short to avoid holding the socket away from a
-# local Gloomberb for long. A failed scheduled run emails the repository owner
-# through GitHub's default notification settings.
+# local Gloomberb for long, and when a local Gloomberb already holds it the run
+# is a pass with a SKIP line rather than a failure (--busy-ok): the keys were
+# accepted and the stream is in use, which is the normal state on a trading
+# day. A failed scheduled run emails the repository owner through GitHub's
+# default notification settings.
 on:
   schedule:
     # 13:42 UTC is 9:42 AM New York during daylight time (UTC-4) and 8:42 AM
@@ -35,4 +38,4 @@ jobs:
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
-        run: bun scripts/observe-stream.ts --seconds 45 --symbols SPY,AAPL
+        run: bun scripts/observe-stream.ts --seconds 45 --symbols SPY,AAPL --busy-ok
