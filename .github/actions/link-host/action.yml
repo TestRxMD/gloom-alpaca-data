@@ -1,0 +1,19 @@
+name: Link the Gloomberb host
+description: >-
+  Clone Gloomberb at a tag and symlink it (and its React) into node_modules,
+  mirroring what Gloomberb does at plugin install time. One copy of gloomberb
+  and react, so typecheck and scripts resolve "gloomberb/*" the way the app does.
+inputs:
+  tag:
+    description: Gloomberb git tag to link. Keep it equal to "minGloom" in gloom.json.
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        git clone --depth 1 --branch "${{ inputs.tag }}" https://github.com/gloom-sh/gloomberb.git "$RUNNER_TEMP/gloomberb"
+        bun install --cwd "$RUNNER_TEMP/gloomberb"
+        mkdir -p node_modules
+        ln -sfn "$RUNNER_TEMP/gloomberb" node_modules/gloomberb
+        ln -sfn "$RUNNER_TEMP/gloomberb/node_modules/react" node_modules/react

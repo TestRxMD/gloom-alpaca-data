@@ -8,9 +8,6 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    env:
-      # Pinned to the tag matching "minGloom" in gloom.json. Bump both together.
-      GLOOMBERB_TAG: v0.17.2
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -19,16 +16,11 @@ jobs:
 
       - run: bun install
 
-      # Mirrors what Gloomberb does at install time: link the host rather than
-      # depending on it, so there is exactly one copy of gloomberb and react and
-      # typecheck runs against the same module graph the app loads the plugin into.
       - name: Link the Gloomberb host
-        run: |
-          git clone --depth 1 --branch "$GLOOMBERB_TAG" https://github.com/gloom-sh/gloomberb.git "$RUNNER_TEMP/gloomberb"
-          bun install --cwd "$RUNNER_TEMP/gloomberb"
-          mkdir -p node_modules
-          ln -sfn "$RUNNER_TEMP/gloomberb" node_modules/gloomberb
-          ln -sfn "$RUNNER_TEMP/gloomberb/node_modules/react" node_modules/react
+        uses: ./.github/actions/link-host
+        with:
+          # The tag matching "minGloom" in gloom.json. Bump both together.
+          tag: v0.17.2
 
       - run: bun run typecheck
       - run: bun test

@@ -23,6 +23,14 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
+
+      # The stream and credential modules import from gloomberb/utils, so the
+      # host has to be linked here too.
+      - name: Link the Gloomberb host
+        uses: ./.github/actions/link-host
+        with:
+          tag: v0.17.2
+
       - name: Watch SPY and AAPL for 45 seconds
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
