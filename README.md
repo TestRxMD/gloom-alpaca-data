@@ -88,6 +88,14 @@ gloomberb quote AAPL --json
 - **One streaming connection.** A free account holds one websocket. Another
   process on the same keys (a bot, a second Gloomberb) takes it over, and the
   plugin falls back to re-reading snapshots once a minute until it is free.
+  Two Gloomberbs at once (the terminal app and the desktop app, or either one
+  and `gloomberb api subscribe`) are the usual case: Alpaca answers the second
+  one `406 connection limit exceeded`, and whichever connected first keeps
+  streaming. The app shows a toast and a debug-log line once when that
+  happens and once when the connection is free again; the second instance
+  retries every 30 seconds in between. A CLI command has no logger, so there
+  `--json` output simply keeps `"delivery": "poll"` with a fresh seed every
+  minute.
 - **Sessions and holidays.** The market state is derived from the New York
   clock, corrected by Alpaca's market clock for holidays during regular hours.
 

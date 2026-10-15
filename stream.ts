@@ -13,6 +13,13 @@ import type { StreamQuote, StreamTrade } from "./quotes";
 export interface StreamLogger {
   warn(message: string): void;
   error(message: string): void;
+  /** Something the person should see once, not only in the debug log; falls back to warn(). */
+  notice?(message: string): void;
+}
+
+export interface StreamOptions {
+  /** How long to wait before retrying when another process holds the account's one connection. */
+  connectionLimitRetryMs?: number;
 }
 
 export interface StreamHandlers {
@@ -52,12 +59,18 @@ export class AlpacaIexStream {
   private connecting = false;
   private disposed = false;
   private authFailed = false;
+  /** The connection-limit refusal has been reported and not yet lifted by an authentication. */
+  private connectionLimitReported = false;
+  private readonly connectionLimitRetryMs: number;
 
   constructor(
     private readonly credentials: CredentialStore,
     private readonly handlers: StreamHandlers,
     private readonly log?: StreamLogger,
-  ) {}
+    options?: StreamOptions,
+  ) {
+    this.connectionLimitRetryMs = options?.connectionLimitRetryMs ?? CONNECTION_LIMIT_RETRY_MS;
+  }
 
   /** Wants trades and quotes for these symbols until the returned function is called. */
   subscribe(symbols: readonly string[]): () => void {
@@ -162,6 +175,10 @@ export class AlpacaIexStream {
             this.reconnectDelay = INITIAL_RECONNECT_MS;
             this.subscribed.clear();
             this.flushSubscriptions();
+            if (this.connectionLimitReported) {
+              this.connectionLimitReported = false;
+              this.notice("Alpaca stream: the connection is free again; streaming quotes.");
+            }
             this.handlers.onReady?.();
           }
           break;
@@ -179,8 +196,16 @@ export class AlpacaIexStream {
             this.log?.error(`Alpaca stream: ${control.msg ?? "authentication failed"} (${code}); streaming is off until the keys change.`);
             this.closeSocket();
           } else if (code === 406) {
-            this.log?.warn("Alpaca stream: the account's one connection is in use elsewhere; retrying in 30s.");
-            this.reconnectDelay = CONNECTION_LIMIT_RETRY_MS;
+            // A free Alpaca account holds one stream: another Gloomberb (terminal, desktop, or a CLI
+            // subscribe) or another program has it. Say so once; quotes keep polling every minute.
+            if (!this.connectionLimitReported) {
+              this.connectionLimitReported = true;
+              this.notice(
+                "Alpaca stream: the account's one streaming connection is in use by another process "
+                + "(another Gloomberb window or CLI, or another program); quotes poll every minute until it is free.",
+              );
+            }
+            this.reconnectDelay = this.connectionLimitRetryMs;
             this.closeSocket();
             this.scheduleReconnect();
           } else {
@@ -192,6 +217,12 @@ export class AlpacaIexStream {
           break;
       }
     }
+  }
+
+  private notice(message: string): void {
+    if (!this.log) return;
+    if (this.log.notice) this.log.notice(message);
+    else this.log.warn(message);
   }
 
   /** Lets a later key change lift an authentication failure. */

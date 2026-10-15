@@ -66,6 +66,11 @@ export const alpacaDataPlugin = {
     alpacaProvider.setLogger({
       warn: (message) => ctx.log.warn(message),
       error: (message) => ctx.log.error(message),
+      // Once per episode: the one stream connection is taken, or free again.
+      notice: (message) => {
+        ctx.log.warn(message);
+        ctx.notify({ title: "Alpaca Market Data", body: message.replace(/^Alpaca stream: /, ""), type: "info", toast: true, duration: 12_000 });
+      },
     });
   },
 
