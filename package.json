@@ -11,7 +11,7 @@
     "link-host": "bash scripts/link-host.sh"
   },
   "peerDependencies": {
-    "gloomberb": ">=0.17.0",
+    "gloomberb": ">=0.17.2",
     "react": ">=19"
   },
   "peerDependenciesMeta": {

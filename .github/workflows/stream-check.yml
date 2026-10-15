@@ -1,0 +1,30 @@
+name: Stream check
+
+# Opens the plugin's IEX websocket for 45 seconds shortly after the New York
+# open and fails when no trades arrive. Alpaca's free plan allows one websocket
+# per account, so the run is kept short to avoid holding the socket away from a
+# local Gloomberb for long. A failed scheduled run emails the repository owner
+# through GitHub's default notification settings.
+on:
+  schedule:
+    # 13:42 UTC is 9:42 AM New York during daylight time (UTC-4) and 8:42 AM
+    # during standard time (UTC-5, early November to mid-March). Both are inside
+    # IEX's trading window (8:00 to 17:00 New York), but only the daylight-time
+    # slot is after the regular 9:30 open. GitHub cron has no time-zone option.
+    - cron: "42 13 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - name: Watch SPY and AAPL for 45 seconds
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: bun scripts/observe-stream.ts --seconds 45 --symbols SPY,AAPL

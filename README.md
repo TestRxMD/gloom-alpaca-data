@@ -1,5 +1,8 @@
 # Alpaca Market Data for Gloomberb
 
+[![CI](https://github.com/TestRxMD/gloom-alpaca-data/actions/workflows/ci.yml/badge.svg)](https://github.com/TestRxMD/gloom-alpaca-data/actions/workflows/ci.yml)
+[![Stream check](https://github.com/TestRxMD/gloom-alpaca-data/actions/workflows/stream-check.yml/badge.svg)](https://github.com/TestRxMD/gloom-alpaca-data/actions/workflows/stream-check.yml)
+
 A [Gloomberb](https://github.com/gloom-sh/gloomberb) plugin that serves US-listed
 equities and ETFs from [Alpaca Market Data](https://alpaca.markets/data) ahead of
 Gloom Cloud. Alpaca's free plan includes the IEX feed in real time, so quotes,
@@ -27,6 +30,14 @@ falls through to Gloom Cloud as before.
 A quote carries `providerId: "alpaca"` and `dataSource: "live"` when Alpaca
 answered it. `gloomberb quote AAPL --json` shows both.
 
+## Install
+
+```bash
+gloomberb install TestRxMD/gloom-alpaca-data
+```
+
+Needs Gloomberb 0.17.2 or newer and a free Alpaca API key pair (see Setup).
+
 ## Setup
 
 1. Create a free account at [app.alpaca.markets](https://app.alpaca.markets) and
@@ -35,7 +46,7 @@ answered it. `gloomberb quote AAPL --json` shows both.
 2. Install the plugin:
 
    ```bash
-   gloomberb install jnieters/gloom-alpaca-data
+   gloomberb install TestRxMD/gloom-alpaca-data
    ```
 
    or, from a checkout, `gloomberb plugin link ./gloom-alpaca-data`.
@@ -99,6 +110,23 @@ one copy of `gloomberb` and `react`, linked rather than installed. A packaged
 Gloomberb (the .app) has no source tree to link, so the script keeps a checkout
 under `~/.cache/gloomberb-host` (`GLOOMBERB_SRC` overrides the path,
 `GLOOMBERB_VERSION` the tag).
+
+### Continuous integration
+
+- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request. It
+  links Gloomberb at the tag matching `minGloom` in `gloom.json`, then runs
+  `bun run typecheck` and `bun test`. When the repository secrets
+  `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` are present it also opens the IEX
+  websocket for a 20-second authenticate-and-subscribe handshake; forks without
+  the secrets skip that step and still pass.
+- **Stream check** (`.github/workflows/stream-check.yml`) runs on weekdays at
+  13:42 UTC (9:42 AM New York during daylight time, 8:42 AM during standard
+  time) and on demand. It watches SPY and AAPL for 45 seconds and fails when no
+  trade arrives. A failed scheduled run emails the repository owner through
+  GitHub's default notification settings. The run is kept short because a free
+  Alpaca account allows one websocket, and the check takes it away from any
+  local Gloomberb on the same keys while it runs. A run outside IEX hours or on
+  a market holiday is expected to fail.
 
 ### Layout
 

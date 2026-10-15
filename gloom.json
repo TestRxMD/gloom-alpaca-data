@@ -11,5 +11,5 @@
     "paper-api.alpaca.markets",
     "api.alpaca.markets"
   ],
-  "minGloom": "0.17.0"
+  "minGloom": "0.17.2"
 }

@@ -14,7 +14,8 @@ import { AlpacaIexStream } from "../stream";
 const args = process.argv.slice(2);
 const flag = (name: string, fallback: string): string => {
   const index = args.indexOf(`--${name}`);
-  return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
+  const value = index >= 0 ? args[index + 1] : undefined;
+  return value || fallback;
 };
 const seconds = Number(flag("seconds", "30"));
 const symbols = flag("symbols", "SPY,AAPL").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
