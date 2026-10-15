@@ -1,0 +1,15 @@
+{
+  "id": "alpaca-data",
+  "name": "Alpaca Market Data",
+  "tagline": "Real-time US equity quotes, charts and options chains from Alpaca's free IEX feed",
+  "description": "Serves US-listed equities and ETFs from Alpaca Market Data ahead of Gloom Cloud: real-time IEX quotes and streaming trades, intraday and daily bars at every chart resolution, and options chains from the indicative options feed. Fundamentals, filings, news, FX and non-US listings keep coming from Gloom Cloud. Needs a free Alpaca account's API key pair.",
+  "categories": ["data", "market-data"],
+  "targets": ["cli", "tui", "desktop", "web"],
+  "hosts": [
+    "data.alpaca.markets",
+    "stream.data.alpaca.markets",
+    "paper-api.alpaca.markets",
+    "api.alpaca.markets"
+  ],
+  "minGloom": "0.17.0"
+}
