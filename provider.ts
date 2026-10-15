@@ -49,6 +49,12 @@ const SNAPSHOT_BATCH_SIZE = 100;
 /** How often streamed quotes are re-seeded from a snapshot, which also moves them across session boundaries. */
 const STREAM_RESEED_MS = 60_000;
 const POLL_FALLBACK_MS = 10_000;
+/**
+ * A stream this much quieter than the snapshots is dead. Alpaca sends no
+ * heartbeat, so a socket left half-open by a network change looks exactly like
+ * a quiet market; the snapshot's latest trade tells the two apart.
+ */
+const STALE_STREAM_MS = 45_000;
 const DEFAULT_SEARCH_LIMIT = 10;
 
 interface CacheEntry<T> {
@@ -59,6 +65,13 @@ interface CacheEntry<T> {
 interface SymbolSubscription {
   listeners: Set<(quote: Quote) => void>;
   release: () => void;
+}
+
+export interface ProviderOptions {
+  /** How often streamed symbols are re-seeded from a snapshot. */
+  reseedMs?: number;
+  /** How far the snapshot's latest trade may run ahead of the stream's last message before the stream is reopened. */
+  staleStreamMs?: number;
 }
 
 /** A miss the router keeps quiet about: its message matches the host's expected-miss pattern. */
@@ -82,9 +95,13 @@ export class AlpacaProvider implements AssetDataProvider {
   private readonly subscriptions = new Map<string, SymbolSubscription>();
   private readonly lastQuotes = new Map<string, Quote>();
   private reseedTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly reseedMs: number;
+  private readonly staleStreamMs: number;
 
-  constructor(private readonly credentials: CredentialStore, client?: AlpacaClient) {
+  constructor(private readonly credentials: CredentialStore, client?: AlpacaClient, options?: ProviderOptions) {
     this.client = client ?? new AlpacaClient(credentials);
+    this.reseedMs = options?.reseedMs ?? STREAM_RESEED_MS;
+    this.staleStreamMs = options?.staleStreamMs ?? STALE_STREAM_MS;
   }
 
   setLogger(log: StreamLogger | null): void {
@@ -289,20 +306,34 @@ export class AlpacaProvider implements AssetDataProvider {
   private async seedStream(targets: QuoteSubscriptionTarget[]): Promise<void> {
     try {
       const results = await this.getQuotesBatch(targets);
+      let newestTrade: number | undefined;
       for (const result of results) {
         if (!result.quote) continue;
         const symbol = parseTicker(result.target.symbol, result.target.exchange).symbol;
         if (!this.subscriptions.has(symbol)) continue;
         this.emit(symbol, result.quote);
+        const printed = result.quote.lastTradeTime ?? result.quote.lastUpdated;
+        if (newestTrade == null || printed > newestTrade) newestTrade = printed;
       }
+      this.checkStreamLiveness(newestTrade);
     } catch (error) {
       this.log?.warn(`Alpaca: could not seed streamed quotes: ${String(error)}`);
     }
   }
 
+  /** Reopens a stream that has been silent while the snapshots show trades printing. */
+  private checkStreamLiveness(newestTradeMs: number | undefined): void {
+    const stream = this.stream;
+    if (!stream?.isLive || newestTradeMs == null) return;
+    const lastMessage = stream.lastMessageAt;
+    if (lastMessage == null) return;
+    const behind = newestTradeMs - lastMessage;
+    if (behind > this.staleStreamMs) stream.reconnect(`silent for ${Math.round(behind / 1000)}s while trades printed`);
+  }
+
   private startReseeding(): void {
     if (this.reseedTimer) return;
-    const interval = hasWebSocket() ? STREAM_RESEED_MS : POLL_FALLBACK_MS;
+    const interval = hasWebSocket() ? this.reseedMs : POLL_FALLBACK_MS;
     this.reseedTimer = setInterval(() => {
       const targets: QuoteSubscriptionTarget[] = [...this.subscriptions.keys()].map((symbol) => ({ symbol }));
       if (targets.length > 0) void this.seedStream(targets);

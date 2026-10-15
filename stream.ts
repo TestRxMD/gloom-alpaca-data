@@ -62,6 +62,8 @@ export class AlpacaIexStream {
   /** The connection-limit refusal has been reported and not yet lifted by an authentication. */
   private connectionLimitReported = false;
   private readonly connectionLimitRetryMs: number;
+  /** When the server last sent anything, data or control; null before the first message. */
+  private messageAt: number | null = null;
 
   constructor(
     private readonly credentials: CredentialStore,
@@ -94,6 +96,24 @@ export class AlpacaIexStream {
 
   get isLive(): boolean {
     return this.authenticated && this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  /** When the current socket last received a message, or null when none has. */
+  get lastMessageAt(): number | null {
+    return this.messageAt;
+  }
+
+  /**
+   * Drops the socket and opens a new one at once. For a connection that TCP
+   * still calls open but that carries nothing: Alpaca sends no heartbeat, so a
+   * socket that went half-open after a network change only shows as silence.
+   */
+  reconnect(reason: string): void {
+    if (this.disposed || this.wanted.size === 0) return;
+    this.log?.warn(`Alpaca stream: ${reason}; reconnecting.`);
+    this.closeSocket();
+    this.reconnectDelay = INITIAL_RECONNECT_MS;
+    this.ensureConnection();
   }
 
   dispose(): void {
@@ -158,6 +178,7 @@ export class AlpacaIexStream {
     } catch {
       return;
     }
+    this.messageAt = Date.now();
     for (const message of messages) {
       switch (message.T) {
         case "t":
@@ -272,6 +293,7 @@ export class AlpacaIexStream {
     this.authenticated = false;
     this.subscribed.clear();
     this.connecting = false;
+    this.messageAt = null;
     if (!socket) return;
     try {
       socket.onclose = null;

@@ -83,8 +83,11 @@ gloomberb quote AAPL --json
 - **Charts** show regular-hours bars (09:30 to 16:00) unless the chart asks for
   extended hours. History reaches back to 2016 at every resolution.
 - **Options** use Alpaca's indicative feed: real-time, derived quotes. Implied
-  volatility is shown when the feed includes it, otherwise 0. Open interest is
-  the prior session's, dated in the chain's `openInterestAsOf`.
+  volatility is shown when the feed includes it, otherwise 0: during the
+  session roughly the strikes near the money carry it (checked 2026-10-15, AAPL
+  weekly: 19 of 95 calls and 21 of 95 puts), deep in-the-money contracts and
+  pre-market chains come without it. Open interest is the prior session's,
+  dated in the chain's `openInterestAsOf`.
 - **One streaming connection.** A free account holds one websocket. Another
   process on the same keys (a bot, a second Gloomberb) takes it over, and the
   plugin falls back to re-reading snapshots once a minute until it is free.
@@ -98,6 +101,12 @@ gloomberb quote AAPL --json
   minute.
 - **Sessions and holidays.** The market state is derived from the New York
   clock, corrected by Alpaca's market clock for holidays during regular hours.
+- **Silent sockets.** Alpaca's stream sends no heartbeat, so a websocket left
+  half-open by a network change (sleep, Wi-Fi roaming, an IPv6 flap) looks like
+  a quiet market. Streamed symbols are re-seeded from a snapshot once a minute
+  anyway; when that snapshot's latest trade is more than 45 seconds newer than
+  the stream's last message, the socket is dropped and reopened, with a
+  "silent for Ns while trades printed" line in the debug log.
 
 ## Development
 

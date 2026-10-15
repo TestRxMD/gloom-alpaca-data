@@ -1,39 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { CredentialStore } from "./credentials";
+import { FakeSocket, installFakeSocket, latestSocket, restoreSocket } from "./fixtures/fake-socket";
 import { AlpacaIexStream } from "./stream";
 
-/** A scripted WebSocket: the test opens it, feeds it server messages, and reads what was sent. */
-class FakeSocket {
-  static OPEN = 1;
-  static instances: FakeSocket[] = [];
-  readyState = 0;
-  sent: string[] = [];
-  onopen: ((event: unknown) => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
-  onclose: ((event: { code: number; reason: string }) => void) | null = null;
-  constructor(public readonly url: string) {
-    FakeSocket.instances.push(this);
-  }
-  send(data: string) {
-    this.sent.push(data);
-  }
-  close() {
-    this.readyState = 3;
-  }
-  open() {
-    this.readyState = FakeSocket.OPEN;
-    this.onopen?.({});
-    this.receive([{ T: "success", msg: "connected" }]);
-  }
-  receive(messages: unknown[]) {
-    this.onmessage?.({ data: JSON.stringify(messages) });
-  }
-}
-
 const credentials = { resolve: async () => ({ keyId: "key", secretKey: "secret", keyType: "paper" as const }) } as unknown as CredentialStore;
-const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
-const originalWebSocket = globalThis.WebSocket;
 
 function logger() {
   const warnings: string[] = [];
@@ -45,21 +15,9 @@ function logger() {
   };
 }
 
-async function latestSocket(): Promise<FakeSocket> {
-  await tick();
-  const socket = FakeSocket.instances.at(-1);
-  if (!socket) throw new Error("no socket was opened");
-  return socket;
-}
-
 describe("AlpacaIexStream connection limit", () => {
-  beforeEach(() => {
-    FakeSocket.instances = [];
-    (globalThis as { WebSocket: unknown }).WebSocket = FakeSocket;
-  });
-  afterEach(() => {
-    (globalThis as { WebSocket: unknown }).WebSocket = originalWebSocket;
-  });
+  beforeEach(installFakeSocket);
+  afterEach(restoreSocket);
 
   test("says once that another process holds the connection, and once when streaming starts", async () => {
     const { log, notices, warnings } = logger();
